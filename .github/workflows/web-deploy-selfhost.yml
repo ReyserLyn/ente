@@ -77,7 +77,7 @@ jobs:
         run: npm i -g wrangler@latest
 
       - name: Publish photos to dedicated Pages project
-        run: wrangler pages deploy web/apps/photos/out --project-name=ente-photos --commit-dirty=true
+        run: wrangler pages deploy apps/photos/out --project-name=ente-photos --commit-dirty=true
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -86,7 +86,7 @@ jobs:
         run: yarn build:albums
 
       - name: Publish albums to dedicated Pages project
-        run: wrangler pages deploy web/apps/albums/out --project-name=ente-albums --commit-dirty=true
+        run: wrangler pages deploy apps/albums/out --project-name=ente-albums --commit-dirty=true
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -95,7 +95,7 @@ jobs:
         run: yarn build:share
 
       - name: Publish share to dedicated Pages project
-        run: wrangler pages deploy web/apps/share/out --project-name=ente-share --commit-dirty=true
+        run: wrangler pages deploy apps/share/out --project-name=ente-share --commit-dirty=true
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
