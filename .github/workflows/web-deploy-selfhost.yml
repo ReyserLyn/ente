@@ -1,0 +1,101 @@
+name: "Deploy (selfhost photos + albums + share)"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "web/**"
+      - ".github/workflows/web-deploy-selfhost.yml"
+  schedule:
+    - cron: "25 2 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Code source to deploy"
+        required: true
+        default: "fork"
+        type: choice
+        options:
+          - fork
+          - upstream
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_PUBLIC_ENTE_ENDPOINT: ${{ vars.NEXT_PUBLIC_ENTE_ENDPOINT }}
+      NEXT_PUBLIC_ENTE_PHOTOS_ENDPOINT: ${{ vars.NEXT_PUBLIC_ENTE_PHOTOS_ENDPOINT }}
+      NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT: ${{ vars.NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT }}
+
+    steps:
+      - name: Checkout fork (default)
+        if: ${{ github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || github.event.inputs.source == 'fork') }}
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Checkout upstream/main (scheduled or manual)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.source == 'upstream') }}
+        uses: actions/checkout@v6
+        with:
+          repository: ente-io/ente
+          ref: main
+          persist-credentials: false
+
+      - name: Setup node and enable yarn caching
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "yarn"
+          cache-dependency-path: "web/yarn.lock"
+
+      - name: Activate Yarn 1.22.22
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify required web env vars
+        run: |
+          test -n "$NEXT_PUBLIC_ENTE_ENDPOINT" || (echo "Missing NEXT_PUBLIC_ENTE_ENDPOINT repo variable" && exit 1)
+          test -n "$NEXT_PUBLIC_ENTE_PHOTOS_ENDPOINT" || (echo "Missing NEXT_PUBLIC_ENTE_PHOTOS_ENDPOINT repo variable" && exit 1)
+          test -n "$NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT" || (echo "Missing NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT repo variable" && exit 1)
+
+      - name: Build photos
+        run: yarn build:photos
+
+      - name: Publish photos to dedicated Pages project
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy --project-name=ente-photos --commit-dirty=true web/apps/photos/out
+
+      - name: Build albums
+        run: yarn build:albums
+
+      - name: Publish albums to dedicated Pages project
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy --project-name=ente-albums --commit-dirty=true web/apps/albums/out
+
+      - name: Build share
+        run: yarn build:share
+
+      - name: Publish share to dedicated Pages project
+        uses: cloudflare/wrangler-action@v3
+        with:
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy --project-name=ente-share --commit-dirty=true web/apps/share/out
